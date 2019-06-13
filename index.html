@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset=utf-8>
+        <title>My first three.js app</title>
+        <link href="https://fonts.googleapis.com/css?family=Roboto:100&display=swap" rel="stylesheet">		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+            .text {
+                position: absolute;
+                width: 100%;
+                display: block;
+                z-index: 100;
+            }
+            #header {
+                font-family: 'Roboto', sans-serif;
+                font-size: 3em;
+                color: #b2bec3;
+                margin-top: 5vh;
+                margin-left: 3vw;
+            }
+		</style>
+	</head>
+	<body>
+    <div id="header" class="text">C h r i s t i a n   |   L e e</div>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/105/three.js"></script>
+    <script src="js/geometries/ConvexGeometry.js"></script>
+    <script src="js/math/ConvexHull.js"></script>
+    <script src="js/controls/OrbitControls.js"></script>
+    <script>
+	// thanks to https://gist.github.com/stephanbogner/a5f50548a06bec723dcb0991dcbb0856
+    var numberOfPoints = 10;
+    var radiusOfSphere = 10;
+    var fibonacciSpherePoints = getFibonacciSpherePoints(numberOfPoints, radiusOfSphere);
+
+    var scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0xffffff, 70, 135);
+    scene.background = new THREE.Color(0xffffff);
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 500);
+    camera.position.set(0, 0, 60);
+    camera.lookAt(new THREE.Vector3(0, 0, 0));
+    var renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // controls
+
+    var controls = new THREE.OrbitControls( camera, renderer.domElement );
+	controls.minDistance = 50;
+	controls.maxDistance = 120;
+
+    initSceneAndAddFibonacciSphere(fibonacciSpherePoints);
+    function getFibonacciSpherePoints(samples, radius, randomize) {
+        samples = samples || 1;
+        radius = radius || 1;
+        randomize = randomize || false;
+        var random = 1;
+        if (randomize === true) {
+            random = Math.random() * samples;
+        }
+        var points = []
+        var offset = 2 / samples
+        var increment = Math.PI * (3 - Math.sqrt(5));
+        for (var i = 0; i < samples; i++) {
+            var y = ((i * offset) - 1) + (offset / 2);
+            var distance = Math.sqrt(1 - Math.pow(y, 2));
+            var phi = ((i + random) % samples) * increment;
+            var x = Math.cos(phi) * distance;
+            var z = Math.sin(phi) * distance;
+            x = x * radius;
+            y = y * radius;
+            z = z * radius;
+            points.push(new THREE.Vector3(x, y, z));
+        }
+        return points;
+    }
+    
+    function initSceneAndAddFibonacciSphere(fibonacciSpherePoints) {
+		var lineMaterial = new THREE.LineDashedMaterial( {
+            color: 0xb2bec3,
+            linewidth: 1,
+            scale: 1,
+            dashSize: 0.8,
+            gapSize: 1,
+        } );
+        var group = new THREE.Group();
+        for (var i = 0; i < fibonacciSpherePoints.length; i++) {
+            var point = fibonacciSpherePoints[i];
+            var radius = 0.5;
+            var geometry = new THREE.SphereGeometry(radius);
+            var material = new THREE.MeshBasicMaterial({ color: 0xeb4d4b,
+                                                         polygonOffset: true,
+                                                         polygonOffsetFactor: 1,
+                                                         polygonOffsetUnits: 1 });
+            var sphere = new THREE.Mesh(geometry, material);
+            sphere.position.x = point.x;
+            sphere.position.y = point.y;
+            sphere.position.z = point.z;
+            group.add(sphere);
+        }
+        var lineGeometry = new THREE.ConvexGeometry(fibonacciSpherePoints);
+        var edgeGeometry = new THREE.EdgesGeometry(lineGeometry);
+        var mesh = new THREE.LineSegments( edgeGeometry, lineMaterial ).computeLineDistances();
+        group.add(mesh);
+		scene.add(group);
+        var animate = function () {
+				requestAnimationFrame( animate );
+
+				group.rotation.x += 0.0005;
+                group.rotation.y += 0.0005;
+                group.rotation.z += 0.0005;
+
+				renderer.render( scene, camera );
+        };
+        animate();
+    
+    }
+
+    function onWindowResize() {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+    }
+    window.addEventListener( 'resize', onWindowResize, false );
+    </script>
+	</body>
+</html>
