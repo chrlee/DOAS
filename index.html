@@ -2,7 +2,7 @@
 <html>
 	<head>
 		<meta charset=utf-8>
-        <title>My first three.js app</title>
+        <title>Christian | Lee</title>
         <link href="https://fonts.googleapis.com/css?family=Lato:100&display=swap" rel="stylesheet">		
         <style>
 			body { margin: 0; }
@@ -21,11 +21,23 @@
                 padding-bottom: 5vh;
                 padding-left: 3vw;
             }
+            #footer {
+                font-family: 'Lato', sans-serif;
+                font-size: 1em;
+                text-align: center;
+                color: #636e72;
+                bottom: 0;
+                padding-bottom: 1vh;
+            }
 		</style>
 	</head>
 	<body>
     <div id="header" class="text">C h r i s t i a n   |   L e e</div>
+    <footer><div id="footer" class="text">This website is a <b>work in progress</b> and is
+    <b>being actively improved and updated</b></div></footer>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/105/three.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/13.8.12/Tone.js"></script>
+    <script src="js/teoria.js"></script>
     <script src="js/geometries/ConvexGeometry.js"></script>
     <script src="js/math/ConvexHull.js"></script>
     <script src="js/controls/OrbitControls.js"></script>
@@ -44,7 +56,7 @@
     camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 500);
     camera.position.set(0, 0, 60);
     camera.lookAt(new THREE.Vector3(0, 0, 0));
-    var renderer = new THREE.WebGLRenderer();
+    var renderer = new THREE.WebGLRenderer({alpha: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
     
@@ -65,6 +77,7 @@
     
     window.addEventListener( 'resize', onWindowResize, false );
 	document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+    document.addEventListener( 'mousedown', onDocumentMouseDown, false );
 
     initSceneAndAddFibonacciSphere(fibonacciSpherePoints);
     function getFibonacciSpherePoints(samples, radius, randomize) {
@@ -114,6 +127,7 @@
             sphere.position.x = point.x;
             sphere.position.y = point.y;
             sphere.position.z = point.z;
+            sphere.name = i;
             group.add(sphere);
         }
         var lineGeometry = new THREE.ConvexGeometry(fibonacciSpherePoints);
@@ -122,7 +136,7 @@
         scene.add(mesh);
 		scene.add(group);
     }
-
+    
     function onWindowResize() {
 
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -136,10 +150,39 @@
 
         event.preventDefault();
 
-        mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
-        mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+        mouse.x = ( event.offsetX / window.innerWidth ) * 2 - 1;
+        mouse.y = - ( event.offsetY / window.innerHeight ) * 2 + 1;
 
     }
+    
+    var intersected = group.children[0];
+    
+    function onDocumentMouseDown( event ) {
+        
+        event.preventDefault();
+        
+        var intersects = raycaster.intersectObjects( group.children );
+        if ( intersects.length > 0 ) {
+            
+            if(intersected.name === intersects[ 0 ].object.name) {
+                var color = Math.random() * 0xffffff;
+                intersects[ 0 ].object.material.color.setHex( color );
+                scene.background = new THREE.Color( color ).addScalar(0.5);
+                intersected = intersects[ 0 ].object;
+                var synth = new Tone.Synth().toMaster()
+                
+                //play a middle 'C' for the duration of an 8th note
+                synth.triggerAttackRelease(teoria.note('C4')
+                                                 .scale('ionian')
+                                                 .get(intersected.name)
+                                                 .toString(), '8n')
+            }
+            else{
+                
+            }
+        }
+    }
+    
 
     function animate() {
         requestAnimationFrame( animate );
@@ -151,31 +194,18 @@
         mesh.rotation.x += 0.0005;
         mesh.rotation.y += 0.0005;
         mesh.rotation.z += 0.0005;
+        
+        scene.background.addScalar(0.02);
 
         raycaster.setFromCamera( mouse, camera );
 
-        var geometry = group.geometry;
-        var intersected = raycaster.intersectObject( group );
+        var intersects = raycaster.intersectObjects( group.children );
 
         if ( intersects.length > 0 ) {
-
-            if ( INTERSECTED != intersects[ 0 ].index ) {
-
-                attributes.size.array[ INTERSECTED ] = PARTICLE_SIZE;
-
-                INTERSECTED = intersects[ 0 ].index;
-
-                attributes.size.array[ INTERSECTED ] = PARTICLE_SIZE * 1.25;
-                attributes.size.needsUpdate = true;
-
-            }
-
-        } else if ( INTERSECTED !== null ) {
-
-            attributes.size.array[ INTERSECTED ] = PARTICLE_SIZE;
-            attributes.size.needsUpdate = true;
-            INTERSECTED = null;
-
+            intersects[ 0 ].object.scale.set(1.3, 1.3, 1.3);
+            intersected = intersects[ 0 ].object;
+        } else {
+            intersected.scale.set(1, 1, 1);
         }
 
         renderer.render( scene, camera );

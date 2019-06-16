@@ -6,107 +6,107 @@
 
 			}
 
-			var group, camera, scene, renderer;
+			var renderer, scene, camera, stats;
+
+			var particles;
+
+			var PARTICLE_SIZE = 20;
+
+			var raycaster, intersects;
+			var mouse, INTERSECTED;
 
 			init();
 			animate();
 
 			function init() {
 
+				var container = document.getElementById( 'container' );
+
 				scene = new THREE.Scene();
 
-				renderer = new THREE.WebGLRenderer( { antialias: true } );
-				renderer.setPixelRatio( window.devicePixelRatio );
-				renderer.setSize( window.innerWidth, window.innerHeight );
-				document.body.appendChild( renderer.domElement );
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000 );
+				camera.position.z = 250;
 
-				// camera
+				//
 
-				camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 1000 );
-				camera.position.set( 15, 20, 30 );
-				scene.add( camera );
+				var vertices = new THREE.BoxGeometry( 200, 200, 200, 16, 16, 16 ).vertices;
 
-				// controls
+				var positions = new Float32Array( vertices.length * 3 );
+				var colors = new Float32Array( vertices.length * 3 );
+				var sizes = new Float32Array( vertices.length );
 
-				var controls = new THREE.OrbitControls( camera, renderer.domElement );
-				controls.minDistance = 20;
-				controls.maxDistance = 50;
-				controls.maxPolarAngle = Math.PI / 2;
+				var vertex;
+				var color = new THREE.Color();
 
-				scene.add( new THREE.AmbientLight( 0x222222 ) );
+				for ( var i = 0, l = vertices.length; i < l; i ++ ) {
 
-				// light
+					vertex = vertices[ i ];
+					vertex.toArray( positions, i * 3 );
 
-				var light = new THREE.PointLight( 0xffffff, 1 );
-				camera.add( light );
+					color.setHSL( 0.01 + 0.1 * ( i / l ), 1.0, 0.5 );
+					color.toArray( colors, i * 3 );
 
-				// helper
-
-				scene.add( new THREE.AxesHelper( 20 ) );
-
-				// textures
-
-				var loader = new THREE.TextureLoader();
-				var texture = loader.load( 'textures/sprites/disc.png' );
-
-				group = new THREE.Group();
-				scene.add( group );
-
-				// points
-
-				var vertices = new THREE.DodecahedronGeometry( 10 ).vertices;
-
-				for ( var i = 0; i < vertices.length; i ++ ) {
-
-					//vertices[ i ].add( randomPoint().multiplyScalar( 2 ) ); // wiggle the points
+					sizes[ i ] = PARTICLE_SIZE * 0.5;
 
 				}
 
-				var pointsMaterial = new THREE.PointsMaterial( {
+				var geometry = new THREE.BufferGeometry();
+				geometry.addAttribute( 'position', new THREE.BufferAttribute( positions, 3 ) );
+				geometry.addAttribute( 'customColor', new THREE.BufferAttribute( colors, 3 ) );
+				geometry.addAttribute( 'size', new THREE.BufferAttribute( sizes, 1 ) );
 
-					color: 0x0080ff,
-					map: texture,
-					size: 1,
-					alphaTest: 0.5
+				//
+
+				var material = new THREE.ShaderMaterial( {
+
+					uniforms: {
+						color: { value: new THREE.Color( 0xffffff ) },
+						texture: { value: new THREE.TextureLoader().load( "textures/sprites/disc.png" ) }
+					},
+					vertexShader: document.getElementById( 'vertexshader' ).textContent,
+					fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+
+					alphaTest: 0.9
 
 				} );
 
-				var pointsGeometry = new THREE.BufferGeometry().setFromPoints( vertices );
+				//
 
-				var points = new THREE.Points( pointsGeometry, pointsMaterial );
-				group.add( points );
+				particles = new THREE.Points( geometry, material );
+				scene.add( particles );
 
-				// convex hull
+				//
 
-				var meshMaterial = new THREE.MeshLambertMaterial( {
-					color: 0xffffff,
-					opacity: 0.5,
-					transparent: true
-				} );
+				renderer = new THREE.WebGLRenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
 
-				var meshGeometry = new THREE.ConvexBufferGeometry( vertices );
+				//
 
-				var mesh = new THREE.Mesh( meshGeometry, meshMaterial );
-				mesh.material.side = THREE.BackSide; // back faces
-				mesh.renderOrder = 0;
-				group.add( mesh );
+				raycaster = new THREE.Raycaster();
+				mouse = new THREE.Vector2();
 
-				var mesh = new THREE.Mesh( meshGeometry, meshMaterial.clone() );
-				mesh.material.side = THREE.FrontSide; // front faces
-				mesh.renderOrder = 1;
-				group.add( mesh );
+				//
+
+				stats = new Stats();
+				container.appendChild( stats.dom );
 
 				//
 
 				window.addEventListener( 'resize', onWindowResize, false );
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
 
 			}
 
-			// function randomPoint() {
+			function onDocumentMouseMove( event ) {
 
-			// 	return new THREE.Vector3( THREE.Math.randFloat( - 1, 1 ), THREE.Math.randFloat( - 1, 1 ), THREE.Math.randFloat( - 1, 1 ) );
+				event.preventDefault();
 
-			// }
+				mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+				mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+			}
 
 			function onWindowResize() {
 
@@ -121,13 +121,43 @@
 
 				requestAnimationFrame( animate );
 
-				group.rotation.y += 0.005;
-
 				render();
+				stats.update();
 
 			}
 
 			function render() {
+
+				particles.rotation.x += 0.0005;
+				particles.rotation.y += 0.001;
+
+				var geometry = particles.geometry;
+				var attributes = geometry.attributes;
+
+				raycaster.setFromCamera( mouse, camera );
+
+				intersects = raycaster.intersectObject( particles );
+
+				if ( intersects.length > 0 ) {
+
+					if ( INTERSECTED != intersects[ 0 ].index ) {
+
+						attributes.size.array[ INTERSECTED ] = PARTICLE_SIZE;
+
+						INTERSECTED = intersects[ 0 ].index;
+
+						attributes.size.array[ INTERSECTED ] = PARTICLE_SIZE * 1.25;
+						attributes.size.needsUpdate = true;
+
+					}
+
+				} else if ( INTERSECTED !== null ) {
+
+					attributes.size.array[ INTERSECTED ] = PARTICLE_SIZE;
+					attributes.size.needsUpdate = true;
+					INTERSECTED = null;
+
+				}
 
 				renderer.render( scene, camera );
 
